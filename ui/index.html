@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vortex MIDI Workstation</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ── Transport Bar ────────────────────────────────────────────────────────── -->
+<header id="transport">
+  <div id="logo">VORTEX</div>
+
+  <div id="transport-controls">
+    <button id="btn-stop"  class="transport-btn" title="Stop">■</button>
+    <button id="btn-play"  class="transport-btn active" title="Play">▶</button>
+    <button id="btn-tap"   class="transport-btn" title="Tap Tempo">TAP</button>
+  </div>
+
+  <div id="bpm-display">
+    <label>BPM</label>
+    <input id="bpm-input" type="number" min="20" max="300" step="0.1" value="120.0">
+  </div>
+
+  <div id="position-display">
+    <span id="pos-bar">1</span>.<span id="pos-beat">1</span>.<span id="pos-tick">000</span>
+  </div>
+
+  <div id="clock-source">
+    <label>CLOCK</label>
+    <select id="clock-select">
+      <option value="0">Internal</option>
+      <option value="1">MIDI</option>
+    </select>
+  </div>
+
+  <div id="connection-status">
+    <span id="conn-dot" class="dot disconnected"></span>
+    <span id="conn-label">Disconnected</span>
+  </div>
+</header>
+
+<!-- ── Main Workspace ──────────────────────────────────────────────────────── -->
+<main id="workspace">
+
+  <!-- Left: Track List -->
+  <aside id="track-list">
+    <div id="track-list-header">
+      <span>TRACKS</span>
+      <button id="btn-add-track" title="Add track">+</button>
+    </div>
+    <div id="track-list-body">
+      <!-- Populated by sequencer.js -->
+    </div>
+  </aside>
+
+  <!-- Center: Tabbed Main Panel -->
+  <section id="main-panel">
+    <nav id="tab-bar">
+      <button class="tab active"   data-tab="sequencer">SEQUENCER</button>
+      <button class="tab"          data-tab="piano-roll">PIANO ROLL</button>
+      <button class="tab"          data-tab="lfo">LFO EDITOR</button>
+      <button class="tab"          data-tab="mod-matrix">MOD MATRIX</button>
+      <button class="tab"          data-tab="arrange">ARRANGE</button>
+    </nav>
+
+    <!-- Sequencer Tab -->
+    <div id="tab-sequencer" class="tab-content active">
+      <div id="seq-toolbar">
+        <label>Steps: <select id="global-step-count">
+          <option>16</option><option>32</option><option>64</option>
+        </select></label>
+        <label>Zoom: <input id="seq-zoom" type="range" min="1" max="4" step="0.5" value="1.5"></label>
+        <button id="btn-clear-all">Clear All</button>
+      </div>
+      <div id="seq-scroll-container">
+        <canvas id="seq-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Piano Roll Tab -->
+    <div id="tab-piano-roll" class="tab-content">
+      <div id="piano-roll-toolbar">
+        <label>Track: <select id="pr-track-select"></select></label>
+        <label>Scale: <select id="pr-scale-select"><option value="">None</option></select></label>
+        <label>Octave: <input id="pr-octave" type="number" min="0" max="8" value="4"></label>
+      </div>
+      <div id="piano-roll-container">
+        <canvas id="piano-canvas"></canvas>
+        <canvas id="pr-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- LFO Editor Tab -->
+    <div id="tab-lfo" class="tab-content">
+      <div id="lfo-layout">
+        <div id="lfo-instance-list">
+          <div id="lfo-list-header">
+            <span>LFOs</span>
+            <button id="btn-add-lfo">+</button>
+          </div>
+          <div id="lfo-list-body"></div>
+        </div>
+
+        <div id="lfo-shapes-panel">
+          <div id="shape-grid"></div>
+        </div>
+
+        <div id="lfo-preview-panel">
+          <canvas id="lfo-preview-canvas"></canvas>
+          <div id="custom-hint" style="display:none">
+            Click to add points · Drag to move · Right-click to delete
+          </div>
+        </div>
+
+        <div id="lfo-controls">
+          <div class="ctrl-row">
+            <label>Depth</label>
+            <input id="lfo-depth" type="range" min="0" max="1" step="0.01" value="1">
+            <span id="lfo-depth-val">1.00</span>
+          </div>
+          <div class="ctrl-row">
+            <label>Sync</label>
+            <select id="lfo-sync-div">
+              <option value="15360">4 bars</option>
+              <option value="7680">2 bars</option>
+              <option value="3840" selected>1 bar</option>
+              <option value="1920">1/2</option>
+              <option value="960">1/4</option>
+              <option value="480">1/8</option>
+              <option value="240">1/16</option>
+              <option value="120">1/32</option>
+            </select>
+          </div>
+          <div class="ctrl-row">
+            <label>Phase</label>
+            <input id="lfo-phase" type="range" min="0" max="1" step="0.01" value="0">
+            <span id="lfo-phase-val">0.00</span>
+          </div>
+          <div class="ctrl-row">
+            <label>Bipolar</label>
+            <input id="lfo-bipolar" type="checkbox" checked>
+          </div>
+          <button id="btn-apply-lfo">Apply</button>
+          <button id="btn-remove-lfo">Remove LFO</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mod Matrix Tab -->
+    <div id="tab-mod-matrix" class="tab-content">
+      <div id="mod-matrix-toolbar">
+        <span class="hint">Click a cell to create a route · Drag the amount knob</span>
+      </div>
+      <div id="mod-matrix-scroll">
+        <table id="mod-table">
+          <thead id="mod-thead"></thead>
+          <tbody id="mod-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Arrange Tab -->
+    <div id="tab-arrange" class="tab-content">
+      <div id="arrange-toolbar">
+        <button id="btn-add-clip">+ Add Clip</button>
+        <label>Loop: <input id="arrange-loop" type="checkbox"></label>
+      </div>
+      <div id="arrange-timeline">
+        <canvas id="arrange-canvas"></canvas>
+      </div>
+      <div id="arrange-clip-list"></div>
+    </div>
+  </section>
+
+  <!-- Right: Utility Panel -->
+  <aside id="utility-panel">
+
+    <!-- Scale -->
+    <div class="util-section" id="scale-section">
+      <div class="util-header">SCALE</div>
+      <select id="scale-root">
+        <option value="0">C</option><option value="1">C#</option>
+        <option value="2">D</option><option value="3">D#</option>
+        <option value="4">E</option><option value="5">F</option>
+        <option value="6">F#</option><option value="7">G</option>
+        <option value="8">G#</option><option value="9">A</option>
+        <option value="10">A#</option><option value="11">B</option>
+      </select>
+      <select id="scale-mode">
+        <option value="0">Major</option>
+        <option value="1">Natural Minor</option>
+        <option value="2">Dorian</option>
+        <option value="3">Phrygian</option>
+        <option value="4">Lydian</option>
+        <option value="5">Mixolydian</option>
+        <option value="6">Locrian</option>
+        <option value="7">Harmonic Minor</option>
+        <option value="8">Melodic Minor</option>
+        <option value="9">Pentatonic Major</option>
+        <option value="10">Pentatonic Minor</option>
+        <option value="11">Blues</option>
+        <option value="12">Whole Tone</option>
+        <option value="13">Diminished</option>
+        <option value="14">Augmented</option>
+        <option value="15">Chromatic</option>
+      </select>
+      <div id="scale-dots"></div>
+      <button id="btn-apply-scale">Apply to Track</button>
+    </div>
+
+    <!-- Scenes -->
+    <div class="util-section" id="scene-section">
+      <div class="util-header">SCENES</div>
+      <div id="scene-list"></div>
+      <div class="scene-controls">
+        <input id="scene-name-input" placeholder="Scene name…">
+        <button id="btn-capture-scene">Capture</button>
+      </div>
+      <div class="scene-recall-mode">
+        <label>Recall:
+          <select id="scene-recall-mode">
+            <option value="jump">Jump</option>
+            <option value="fade">Fade</option>
+            <option value="drop">Drop</option>
+            <option value="morph">Morph</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- MIDI I/O -->
+    <div class="util-section" id="midi-section">
+      <div class="util-header">MIDI I/O</div>
+      <div id="midi-in-list">
+        <div class="midi-sub-header">IN</div>
+      </div>
+      <div id="midi-out-list">
+        <div class="midi-sub-header">OUT</div>
+      </div>
+      <button id="btn-discover-midi">Discover</button>
+    </div>
+
+    <!-- Patterns -->
+    <div class="util-section" id="pattern-section">
+      <div class="util-header">PATTERNS</div>
+      <div id="pattern-list"></div>
+      <div class="pattern-controls">
+        <input id="pattern-name-input" placeholder="Pattern name…">
+        <button id="btn-save-pattern">Save</button>
+      </div>
+    </div>
+
+  </aside>
+</main>
+
+<!-- ── Status Bar ───────────────────────────────────────────────────────────── -->
+<footer id="status-bar">
+  <span id="status-text">Ready</span>
+  <div id="midi-activity">
+    <span class="led" id="led-midi-in"  title="MIDI In">IN</span>
+    <span class="led" id="led-midi-out" title="MIDI Out">OUT</span>
+  </div>
+</footer>
+
+<!-- Step detail modal -->
+<dialog id="step-modal">
+  <div id="step-modal-content">
+    <h3>Step Properties</h3>
+    <label>Note: <input id="sm-note" type="number" min="0" max="127" value="60"></label>
+    <label>Velocity: <input id="sm-vel" type="range" min="1" max="127" value="100"></label>
+    <span id="sm-vel-val">100</span>
+    <label>Gate %: <input id="sm-gate" type="range" min="1" max="100" value="75"></label>
+    <span id="sm-gate-val">75</span>
+    <label>Accent: <input id="sm-accent" type="checkbox"></label>
+    <label>Slide: <input id="sm-slide" type="checkbox"></label>
+    <label>Pitch offset: <input id="sm-pitch-offset" type="number" min="-24" max="24" value="0"></label>
+    <div class="modal-buttons">
+      <button id="btn-sm-apply">Apply</button>
+      <button id="btn-sm-cancel">Cancel</button>
+    </div>
+  </div>
+</dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

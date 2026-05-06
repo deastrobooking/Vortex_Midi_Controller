@@ -43,6 +43,31 @@ public:
     std::vector<AutomationClip> loadClips(int projectId) const;
     bool             deleteClip(const std::string& clipId);
 
+    // ─── Sequencer patterns (JSON blob per pattern) ────────────────────────
+    bool                    savePattern(int projectId, const std::string& patternId,
+                                        const std::string& json);
+    std::string             loadPattern(const std::string& patternId) const;
+    std::vector<std::string> loadPatternIds(int projectId) const;
+    bool                    deletePattern(const std::string& patternId);
+
+    // ─── LFO configurations ────────────────────────────────────────────────
+    bool             saveLfo(int projectId, const std::string& lfoId,
+                             const std::string& json);
+    std::vector<std::pair<std::string,std::string>> loadLfos(int projectId) const;
+    bool             deleteLfo(const std::string& lfoId);
+
+    // ─── Mod matrix routes ─────────────────────────────────────────────────
+    bool             saveModRoute(int projectId, const std::string& routeId,
+                                  const std::string& json);
+    std::vector<std::pair<std::string,std::string>> loadModRoutes(int projectId) const;
+    bool             deleteModRoute(const std::string& routeId);
+
+    // ─── Custom scales ─────────────────────────────────────────────────────
+    bool             saveCustomScale(int projectId, const std::string& scaleId,
+                                     const std::string& json);
+    std::vector<std::pair<std::string,std::string>> loadCustomScales(int projectId) const;
+    bool             deleteCustomScale(const std::string& scaleId);
+
     // ─── Settings ──────────────────────────────────────────────────────────
     std::string getSetting(const std::string& key,
                            const std::string& defaultValue = "") const;

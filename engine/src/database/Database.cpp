@@ -329,6 +329,200 @@ bool Database::deleteClip(const std::string& clipId) {
     return ok;
 }
 
+// ─── Sequencer patterns (JSON blob) ──────────────────────────────────────────
+
+bool Database::savePattern(int projectId, const std::string& patternId,
+                           const std::string& json) {
+    sqlite3_stmt* stmt;
+    const char* sql = R"(
+        INSERT INTO seq_patterns (project_id, pattern_id, json_data)
+        VALUES (?,?,?)
+        ON CONFLICT(pattern_id)
+        DO UPDATE SET project_id=excluded.project_id, json_data=excluded.json_data;
+    )";
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int(stmt,  1, projectId);
+    sqlite3_bind_text(stmt, 2, patternId.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, json.c_str(),      -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::string Database::loadPattern(const std::string& patternId) const {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "SELECT json_data FROM seq_patterns WHERE pattern_id=?;",
+        -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, patternId.c_str(), -1, SQLITE_TRANSIENT);
+    std::string result;
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+        result = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+    sqlite3_finalize(stmt);
+    return result;
+}
+
+std::vector<std::string> Database::loadPatternIds(int projectId) const {
+    std::vector<std::string> ids;
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "SELECT pattern_id FROM seq_patterns WHERE project_id=? ORDER BY rowid;",
+        -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, projectId);
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+        ids.push_back(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+    sqlite3_finalize(stmt);
+    return ids;
+}
+
+bool Database::deletePattern(const std::string& patternId) {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "DELETE FROM seq_patterns WHERE pattern_id=?;", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, patternId.c_str(), -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+// ─── LFO configurations ───────────────────────────────────────────────────────
+
+bool Database::saveLfo(int projectId, const std::string& lfoId,
+                       const std::string& json) {
+    sqlite3_stmt* stmt;
+    const char* sql = R"(
+        INSERT INTO lfos (project_id, lfo_id, json_data) VALUES (?,?,?)
+        ON CONFLICT(lfo_id)
+        DO UPDATE SET project_id=excluded.project_id, json_data=excluded.json_data;
+    )";
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int(stmt,  1, projectId);
+    sqlite3_bind_text(stmt, 2, lfoId.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, json.c_str(),  -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::vector<std::pair<std::string,std::string>> Database::loadLfos(int projectId) const {
+    std::vector<std::pair<std::string,std::string>> out;
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "SELECT lfo_id, json_data FROM lfos WHERE project_id=? ORDER BY rowid;",
+        -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, projectId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        out.push_back({
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))
+        });
+    }
+    sqlite3_finalize(stmt);
+    return out;
+}
+
+bool Database::deleteLfo(const std::string& lfoId) {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "DELETE FROM lfos WHERE lfo_id=?;", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, lfoId.c_str(), -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+// ─── Mod matrix routes ────────────────────────────────────────────────────────
+
+bool Database::saveModRoute(int projectId, const std::string& routeId,
+                            const std::string& json) {
+    sqlite3_stmt* stmt;
+    const char* sql = R"(
+        INSERT INTO mod_routes (project_id, route_id, json_data) VALUES (?,?,?)
+        ON CONFLICT(route_id)
+        DO UPDATE SET project_id=excluded.project_id, json_data=excluded.json_data;
+    )";
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int(stmt,  1, projectId);
+    sqlite3_bind_text(stmt, 2, routeId.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, json.c_str(),    -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::vector<std::pair<std::string,std::string>> Database::loadModRoutes(int projectId) const {
+    std::vector<std::pair<std::string,std::string>> out;
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "SELECT route_id, json_data FROM mod_routes WHERE project_id=? ORDER BY rowid;",
+        -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, projectId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        out.push_back({
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))
+        });
+    }
+    sqlite3_finalize(stmt);
+    return out;
+}
+
+bool Database::deleteModRoute(const std::string& routeId) {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "DELETE FROM mod_routes WHERE route_id=?;", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, routeId.c_str(), -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+// ─── Custom scales ────────────────────────────────────────────────────────────
+
+bool Database::saveCustomScale(int projectId, const std::string& scaleId,
+                               const std::string& json) {
+    sqlite3_stmt* stmt;
+    const char* sql = R"(
+        INSERT INTO custom_scales (project_id, scale_id, json_data) VALUES (?,?,?)
+        ON CONFLICT(scale_id)
+        DO UPDATE SET project_id=excluded.project_id, json_data=excluded.json_data;
+    )";
+    if (sqlite3_prepare_v2(m_db, sql, -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_int(stmt,  1, projectId);
+    sqlite3_bind_text(stmt, 2, scaleId.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, json.c_str(),    -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+std::vector<std::pair<std::string,std::string>> Database::loadCustomScales(int projectId) const {
+    std::vector<std::pair<std::string,std::string>> out;
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "SELECT scale_id, json_data FROM custom_scales WHERE project_id=? ORDER BY rowid;",
+        -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, projectId);
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        out.push_back({
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)),
+            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1))
+        });
+    }
+    sqlite3_finalize(stmt);
+    return out;
+}
+
+bool Database::deleteCustomScale(const std::string& scaleId) {
+    sqlite3_stmt* stmt;
+    sqlite3_prepare_v2(m_db,
+        "DELETE FROM custom_scales WHERE scale_id=?;", -1, &stmt, nullptr);
+    sqlite3_bind_text(stmt, 1, scaleId.c_str(), -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
 std::string Database::getSetting(const std::string& key,

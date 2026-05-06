@@ -28,7 +28,14 @@ set(ENGINE_SOURCES
     src/core/AutomationPlayback.cpp
     src/core/SnapshotEngine.cpp
     src/core/MacroEngine.cpp
+    src/core/ScaleEngine.cpp
+    src/core/LfoEngine.cpp
+    src/core/SequencerEngine.cpp
+    src/core/ModMatrix.cpp
+    src/core/ArpEngine.cpp
+    src/core/ArrangeEngine.cpp
     src/midi/MidiOutput.cpp
+    src/midi/MidiInput.cpp
     src/hardware/ModuleManager.cpp
     src/database/Database.cpp
     src/api/WebSocketServer.cpp

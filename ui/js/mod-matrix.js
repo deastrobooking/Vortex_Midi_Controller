@@ -1,0 +1,232 @@
+// ── Modulation Matrix ─────────────────────────────────────────────────────────
+// Table: rows = sources, columns = destinations.
+// Cell click opens amount/curve popup. Active route shown with colored badge.
+
+import { send, on, state } from './app.js';
+
+// Ordered lists that define the grid axes.
+const SOURCES = [
+  { id: 'lfo',          label: 'LFO'       },
+  { id: 'velocity',     label: 'Velocity'  },
+  { id: 'aftertouch',   label: 'Aftertouch'},
+  { id: 'modwheel',     label: 'Mod Wheel' },
+  { id: 'pitchbend',    label: 'Pitch Bend'},
+  { id: 'midi_cc',      label: 'MIDI CC'   },
+];
+
+const DESTS = [
+  { id: 'midi_cc',         label: 'MIDI CC'     },
+  { id: 'seq_pitch',       label: 'Seq Pitch'   },
+  { id: 'seq_velocity',    label: 'Seq Velocity'},
+  { id: 'seq_gate',        label: 'Seq Gate'    },
+  { id: 'seq_rate',        label: 'Seq Rate'    },
+  { id: 'lfo_rate',        label: 'LFO Rate'    },
+  { id: 'lfo_depth',       label: 'LFO Depth'   },
+  { id: 'snapshot_morph',  label: 'Scene Morph' },
+];
+
+let popup       = null;
+let popupRoute  = null;   // { source, dest } or existing route object
+
+export function initModMatrix() {
+  buildTable();
+  buildPopup();
+
+  on('mod_routes_list', () => refreshCells());
+  on('lfos_list',       () => refreshSourceOptions());
+  on('tab_changed', tab => { if (tab === 'mod-matrix') refreshCells(); });
+}
+
+// ── Table construction ────────────────────────────────────────────────────────
+
+function buildTable() {
+  const wrap  = document.getElementById('mod-matrix-wrap');
+  if (!wrap) return;
+
+  const table = document.createElement('table');
+  table.id = 'mod-matrix-table';
+  table.className = 'mod-matrix-table';
+
+  // Header row.
+  const thead = table.createTHead();
+  const hRow  = thead.insertRow();
+  const th0   = document.createElement('th');
+  th0.textContent = 'Source \\ Dest';
+  hRow.appendChild(th0);
+  DESTS.forEach(d => {
+    const th = document.createElement('th');
+    th.textContent = d.label;
+    hRow.appendChild(th);
+  });
+
+  // Body rows.
+  const tbody = table.createTBody();
+  SOURCES.forEach(src => {
+    const row = tbody.insertRow();
+    const th  = document.createElement('th');
+    th.textContent = src.label;
+    row.appendChild(th);
+
+    DESTS.forEach(dst => {
+      const td = row.insertCell();
+      td.dataset.source = src.id;
+      td.dataset.dest   = dst.id;
+      td.className = 'mm-cell';
+      td.addEventListener('click', () => openPopup(src.id, dst.id, td));
+    });
+  });
+
+  wrap.appendChild(table);
+}
+
+// ── Cell refresh ──────────────────────────────────────────────────────────────
+
+function refreshCells() {
+  const routes = state.modRoutes ?? [];
+  document.querySelectorAll('.mm-cell').forEach(td => {
+    const src  = td.dataset.source;
+    const dst  = td.dataset.dest;
+    const route = routes.find(r => r.source === src && r.dest === dst);
+    td.innerHTML = '';
+    td.classList.toggle('mm-active', !!route);
+    if (route) {
+      const badge = document.createElement('span');
+      badge.className = 'mm-badge';
+      const pct = Math.round((route.amount ?? 1) * 100);
+      badge.textContent = `${pct}%`;
+      td.appendChild(badge);
+    }
+  });
+}
+
+function refreshSourceOptions() {
+  // LFO source rows might show per-LFO labels eventually.
+}
+
+// ── Popup ─────────────────────────────────────────────────────────────────────
+
+function buildPopup() {
+  popup = document.createElement('div');
+  popup.id = 'mm-popup';
+  popup.className = 'mm-popup hidden';
+  popup.innerHTML = `
+    <div class="mm-popup-header">
+      <span id="mm-popup-title">Route</span>
+      <button id="mm-popup-close" title="Close">×</button>
+    </div>
+    <label>Amount
+      <input type="range" id="mm-amount" min="-1" max="1" step="0.01" value="1">
+      <span id="mm-amount-val">100%</span>
+    </label>
+    <label>LFO Instance
+      <select id="mm-lfo-id"></select>
+    </label>
+    <label>CC Number
+      <input type="number" id="mm-cc-num" min="0" max="127" value="1">
+    </label>
+    <label>Track
+      <input type="number" id="mm-track-id" min="0" max="63" value="0">
+    </label>
+    <div class="mm-popup-actions">
+      <button id="mm-btn-apply">Apply</button>
+      <button id="mm-btn-remove">Remove</button>
+    </div>
+  `;
+  document.body.appendChild(popup);
+
+  document.getElementById('mm-popup-close').addEventListener('click', closePopup);
+  document.getElementById('mm-amount').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    document.getElementById('mm-amount-val').textContent = `${Math.round(v * 100)}%`;
+  });
+  document.getElementById('mm-btn-apply').addEventListener('click', applyRoute);
+  document.getElementById('mm-btn-remove').addEventListener('click', removeRoute);
+
+  document.addEventListener('click', e => {
+    if (popup && !popup.classList.contains('hidden') &&
+        !popup.contains(e.target) && !e.target.classList.contains('mm-cell')) {
+      closePopup();
+    }
+  });
+}
+
+function openPopup(source, dest, cell) {
+  const route = (state.modRoutes ?? []).find(r => r.source === source && r.dest === dest);
+  popupRoute = route ? { ...route } : { source, dest, amount: 1, lfoId: null, controlId: null, trackId: 0 };
+
+  document.getElementById('mm-popup-title').textContent =
+    `${SOURCES.find(s => s.id === source)?.label} → ${DESTS.find(d => d.id === dest)?.label}`;
+
+  const amount = popupRoute.amount ?? 1;
+  document.getElementById('mm-amount').value = amount;
+  document.getElementById('mm-amount-val').textContent = `${Math.round(amount * 100)}%`;
+  document.getElementById('mm-cc-num').value   = popupRoute.controlId ?? 1;
+  document.getElementById('mm-track-id').value = popupRoute.trackId   ?? 0;
+
+  // Populate LFO list.
+  const sel = document.getElementById('mm-lfo-id');
+  sel.innerHTML = '<option value="">—</option>';
+  (state.lfos ?? []).forEach(lfo => {
+    const opt = document.createElement('option');
+    opt.value       = lfo.lfo_id;
+    opt.textContent = lfo.name || lfo.lfo_id;
+    sel.appendChild(opt);
+  });
+  sel.value = popupRoute.lfoId ?? '';
+
+  // Show/hide relevant fields.
+  const lfoRow   = document.getElementById('mm-lfo-id').closest('label');
+  const ccRow    = document.getElementById('mm-cc-num').closest('label');
+  const trackRow = document.getElementById('mm-track-id').closest('label');
+  lfoRow.style.display   = source === 'lfo'     ? '' : 'none';
+  ccRow.style.display    = source === 'midi_cc' || dest === 'midi_cc' ? '' : 'none';
+  trackRow.style.display = dest.startsWith('seq_') ? '' : 'none';
+
+  // Position popup near cell.
+  const rect = cell.getBoundingClientRect();
+  popup.style.top  = `${rect.bottom + window.scrollY + 4}px`;
+  popup.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 260)}px`;
+  popup.classList.remove('hidden');
+}
+
+function closePopup() {
+  popup.classList.add('hidden');
+  popupRoute = null;
+}
+
+function applyRoute() {
+  if (!popupRoute) return;
+  const lfoId    = document.getElementById('mm-lfo-id').value   || null;
+  const ccNum    = parseInt(document.getElementById('mm-cc-num').value);
+  const trackId  = parseInt(document.getElementById('mm-track-id').value);
+  const amount   = parseFloat(document.getElementById('mm-amount').value);
+
+  const existing = (state.modRoutes ?? []).find(
+    r => r.source === popupRoute.source && r.dest === popupRoute.dest
+  );
+
+  const payload = {
+    source:     popupRoute.source,
+    dest:       popupRoute.dest,
+    amount,
+    lfo_id:     lfoId,
+    control_id: isNaN(ccNum) ? 1 : ccNum,
+    track_id:   isNaN(trackId) ? 0 : trackId,
+  };
+
+  if (existing) {
+    send('update_mod_route', { route_id: existing.route_id, ...payload });
+  } else {
+    send('add_mod_route', payload);
+  }
+  closePopup();
+}
+
+function removeRoute() {
+  if (!popupRoute) return;
+  const existing = (state.modRoutes ?? []).find(
+    r => r.source === popupRoute.source && r.dest === popupRoute.dest
+  );
+  if (existing) send('remove_mod_route', { route_id: existing.route_id });
+  closePopup();
+}

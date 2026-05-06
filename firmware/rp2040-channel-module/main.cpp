@@ -75,28 +75,71 @@ static void generateButtonEvents(uint64_t changed) {
 }
 
 static void handleIncomingCommands() {
-    uint8_t buf[sizeof(LedCommand)];
-    if (!protocolReceiveCommand(uart1, buf, sizeof(buf))) return;
+    if (!uart_is_readable(uart1)) return;
 
-    auto cmd = static_cast<CommandType>(buf[2]);
+    // Peek at magic byte first.
+    uint8_t magic = 0;
+    uart_read_blocking(uart1, &magic, 1);
+    if (magic != kPacketMagic) return;
+
+    // Read moduleId and command type.
+    uint8_t header[2];
+    uart_read_blocking(uart1, header, 2);
+    const auto cmd = static_cast<CommandType>(header[1]);
+
     switch (cmd) {
         case CommandType::SetLed: {
-            const auto* c = reinterpret_cast<const LedCommand*>(buf);
-            g_leds.setColor(c->ledIndex, {c->r, c->g, c->b});
+            // Remaining payload: ledIndex(2) + r,g,b(3) + checksum(1) = 6 bytes
+            uint8_t payload[6];
+            uart_read_blocking(uart1, payload, sizeof(payload));
+            uint16_t ledIndex = static_cast<uint16_t>(payload[0] | (payload[1] << 8));
+            g_leds.setColor(ledIndex, {payload[2], payload[3], payload[4]});
             break;
         }
         case CommandType::SetLedAll: {
-            const auto* c = reinterpret_cast<const LedCommand*>(buf);
-            g_leds.setAll({c->r, c->g, c->b});
+            uint8_t payload[6];
+            uart_read_blocking(uart1, payload, sizeof(payload));
+            g_leds.setAll({payload[2], payload[3], payload[4]});
             break;
         }
-        case CommandType::SetBrightness:
-            g_leds.setBrightness(buf[3]);
+        case CommandType::SetBrightness: {
+            // payload: brightness(1) + checksum(1) = 2 bytes
+            uint8_t payload[2];
+            uart_read_blocking(uart1, payload, sizeof(payload));
+            g_leds.setBrightness(payload[0]);
             break;
+        }
+        case CommandType::SetDisplayLabel: {
+            // Header already consumed (magic, moduleId, type).
+            // Next: displayIndex(1) + labelLen(1).
+            uint8_t meta[2];
+            uart_read_blocking(uart1, meta, 2);
+            uint8_t displayIdx = meta[0];
+            uint8_t labelLen   = meta[1];
+            // Cap at 32 chars + 1 checksum byte.
+            if (labelLen > 32) labelLen = 32;
+            uint8_t labelBuf[33]{};
+            uart_read_blocking(uart1, labelBuf, labelLen + 1); // +1 for checksum
+            labelBuf[labelLen] = '\0';
+            g_displays.setLabel(displayIdx,
+                                reinterpret_cast<const char*>(labelBuf));
+            break;
+        }
         case CommandType::RequestCalib:
             g_calibration.beginCapture();
+            // Consume checksum byte.
+            { uint8_t cs; uart_read_blocking(uart1, &cs, 1); }
+            break;
+        case CommandType::RequestStatus:
+            // Send a heartbeat immediately as a status response.
+            sendEvent(EventType::ModuleHeartbeat, 0, 0);
+            { uint8_t cs; uart_read_blocking(uart1, &cs, 1); }
             break;
         default:
+            // Unknown command — consume up to 16 bytes to resync.
+            for (int i = 0; i < 16 && uart_is_readable(uart1); ++i) {
+                uint8_t discard; uart_read_blocking(uart1, &discard, 1);
+            }
             break;
     }
 }
