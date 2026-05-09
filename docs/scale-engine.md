@@ -15,25 +15,27 @@ The scale engine provides two services:
 
 ## Built-in Scale Modes
 
-| Enum | Name | Semitone pattern |
-|---|---|---|
-| `Major` | Major / Ionian | 2 2 1 2 2 2 1 |
-| `NaturalMinor` | Natural Minor / Aeolian | 2 1 2 2 1 2 2 |
-| `HarmonicMinor` | Harmonic Minor | 2 1 2 2 1 3 1 |
-| `MelodicMinor` | Melodic Minor | 2 1 2 2 2 2 1 |
-| `Dorian` | Dorian | 2 1 2 2 2 1 2 |
-| `Phrygian` | Phrygian | 1 2 2 2 1 2 2 |
-| `Lydian` | Lydian | 2 2 2 1 2 2 1 |
-| `Mixolydian` | Mixolydian | 2 2 1 2 2 1 2 |
-| `Locrian` | Locrian | 1 2 2 1 2 2 2 |
-| `PentatonicMajor` | Major Pentatonic | 2 2 3 2 3 |
-| `PentatonicMinor` | Minor Pentatonic | 3 2 2 3 2 |
-| `Blues` | Blues | 3 2 1 1 3 2 |
-| `WholeTone` | Whole Tone | 2 2 2 2 2 2 |
-| `Diminished` | Diminished (half-whole) | 1 2 1 2 1 2 1 2 |
-| `Augmented` | Augmented | 3 1 3 1 3 1 |
-| `Chromatic` | Chromatic | all 12 semitones |
-| `Custom` | User-defined | user-supplied `degrees[12]` |
+The enum integer value is serialized in the database; do not change the ordering.
+
+| Value | Enum | Name | Semitone pattern |
+|---|---|---|---|
+| 0 | `Major` | Major / Ionian | 2 2 1 2 2 2 1 |
+| 1 | `NaturalMinor` | Natural Minor / Aeolian | 2 1 2 2 1 2 2 |
+| 2 | `Dorian` | Dorian | 2 1 2 2 2 1 2 |
+| 3 | `Phrygian` | Phrygian | 1 2 2 2 1 2 2 |
+| 4 | `Lydian` | Lydian | 2 2 2 1 2 2 1 |
+| 5 | `Mixolydian` | Mixolydian | 2 2 1 2 2 1 2 |
+| 6 | `Locrian` | Locrian | 1 2 2 1 2 2 2 |
+| 7 | `HarmonicMinor` | Harmonic Minor | 2 1 2 2 1 3 1 |
+| 8 | `MelodicMinor` | Melodic Minor | 2 1 2 2 2 2 1 |
+| 9 | `PentatonicMajor` | Major Pentatonic | 2 2 3 2 3 |
+| 10 | `PentatonicMinor` | Minor Pentatonic | 3 2 2 3 2 |
+| 11 | `Blues` | Blues | 3 2 1 1 3 2 |
+| 12 | `WholeTone` | Whole Tone | 2 2 2 2 2 2 |
+| 13 | `Diminished` | Diminished (half-whole) | 1 2 1 2 1 2 1 2 |
+| 14 | `Augmented` | Augmented | 3 1 3 1 3 1 |
+| 15 | `Chromatic` | Chromatic | all 12 semitones |
+| 16 | `Custom` | User-defined | user-supplied `degrees[12]` |
 
 ---
 

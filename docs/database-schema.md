@@ -183,15 +183,17 @@ CREATE TABLE IF NOT EXISTS mod_routes (
 ```json
 {
   "route_id": "r1",
-  "source": "lfo",
+  "source": 0,
   "source_id": "lfo_1",
-  "dest": "midi_cc",
-  "dest_id": "74",
+  "dest": 0,
+  "dest_id": "filter_cc",
   "amount": 0.8,
   "offset": 0.0,
   "enabled": true
 }
 ```
+
+`source` and `dest` are integer enum values matching `ModSource` / `ModDest` in `Types.h` (see [mod-matrix.md](mod-matrix.md) for the full table).
 
 ---
 

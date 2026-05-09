@@ -54,6 +54,7 @@ std::string MessageHandler::handle(const std::string& jsonStr) {
     if (type == "set_tempo")          return handleSetTempo(jsonStr);
     if (type == "transport")          return handleTransport(jsonStr);
     if (type == "save_scene")         return handleSaveScene(jsonStr);
+    if (type == "delete_scene")       return handleDeleteScene(jsonStr);
     if (type == "start_record")       return handleStartRecord(jsonStr);
     if (type == "stop_record")        return handleStopRecord(jsonStr);
     if (type == "list_scenes")        return handleListScenes();
@@ -184,6 +185,14 @@ std::string MessageHandler::handleSaveScene(const std::string& jsonStr) {
     m_snapshots.addScene(sv);
     m_db.saveScene(currentProjectId(), sv);
     return json{{"type","scene_saved"},{"scene_id",sceneId}}.dump();
+}
+
+std::string MessageHandler::handleDeleteScene(const std::string& jsonStr) {
+    auto doc = json::parse(jsonStr);
+    std::string sceneId = doc.value("scene_id","");
+    m_snapshots.removeScene(sceneId);
+    m_db.deleteScene(sceneId);
+    return json{{"type","scene_deleted"},{"scene_id",sceneId}}.dump();
 }
 
 std::string MessageHandler::handleStartRecord(const std::string&) {

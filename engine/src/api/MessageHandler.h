@@ -49,6 +49,7 @@ private:
     std::string handleSetTempo(const std::string& json);
     std::string handleTransport(const std::string& json);
     std::string handleSaveScene(const std::string& json);
+    std::string handleDeleteScene(const std::string& json);
     std::string handleStartRecord(const std::string& json);
     std::string handleStopRecord(const std::string& json);
     std::string handleListScenes();

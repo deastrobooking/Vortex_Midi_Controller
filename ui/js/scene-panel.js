@@ -15,13 +15,16 @@ export function initScenePanel() {
   if (btnCapture) {
     btnCapture.addEventListener('click', () => {
       const name = prompt('Scene name:', `Scene ${(state.sceneIds?.length ?? 0) + 1}`);
-      if (name !== null) send('save_scene', { name });
+      if (name === null) return;
+      // scene_id must be URL-safe; derive from name + timestamp.
+      const sceneId = `scene_${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
+      send('save_scene', { scene_id: sceneId, name });
     });
   }
 
   if (btnRecall) {
     btnRecall.addEventListener('click', () => {
-      if (selectedScene != null) send('recall_scene', { scene_id: selectedScene });
+      if (selectedScene != null) send('trigger_scene', { scene_id: selectedScene });
     });
   }
 
@@ -95,7 +98,7 @@ function renderSceneList() {
         r.classList.toggle('selected', r.dataset.sceneId == id));
     });
     row.addEventListener('dblclick', () => {
-      send('recall_scene', { scene_id: id });
+      send('trigger_scene', { scene_id: id });
     });
 
     list.appendChild(row);

@@ -14,25 +14,32 @@ The sequencer is a 64-track polymetric engine clocked at 960 PPQN (pulses per qu
 
 ```
 SeqPattern
-└── tracks[64]  : SeqTrack
+├── patternId    : string
+├── name         : string
+├── lengthBars   : uint32_t
+└── tracks[]     : SeqTrack          (64 tracks, indexed by trackId)
+    ├── trackId      : uint8_t
     ├── name         : string
-    ├── mode         : Step | Melodic
-    ├── stepCount    : uint8_t (1–64)
-    ├── stepLenTicks : uint32_t (default 240 = 1/4 note)
-    ├── swing        : uint8_t  (0–100 %)
-    ├── baseNote     : uint8_t  (used in Step mode)
-    ├── channel      : uint8_t  (MIDI channel 1–16)
+    ├── midiPort     : uint8_t
+    ├── midiChannel  : uint8_t  (1–16)
+    ├── baseNote     : uint8_t  (root note in step/drum mode)
+    ├── melodic      : bool     (false = step/drum, true = per-step pitch)
+    ├── stepCount    : uint8_t  (1–64)
+    ├── stepTicks    : uint32_t (ticks per step; 240 = 1/16 note @ 960 PPQN)
+    ├── transpose    : int8_t   (global semitone offset)
+    ├── swing        : float    (0.0 = straight, 1.0 = max shuffle)
     ├── useScale     : bool
+    ├── scaleId      : string
+    ├── active       : bool
     ├── muted        : bool
-    ├── soloed       : bool
-    └── steps[64]    : SeqStep
+    └── steps[]      : SeqStep
         ├── active       : bool
-        ├── note         : uint8_t (Melodic mode)
-        ├── velocity     : uint8_t
-        ├── gatePercent  : uint8_t (0–100 %)
-        ├── accent       : bool
-        ├── slide        : bool
-        └── pitchOffset  : int8_t
+        ├── note         : uint8_t (MIDI note; used when melodic = true)
+        ├── velocity     : uint8_t (0–127)
+        ├── gatePercent  : uint8_t (1–100; gate as % of stepTicks)
+        ├── accent       : bool    (adds +20 velocity, clamped to 127)
+        ├── slide        : bool    (suppress note-off before next on)
+        └── pitchOffset  : int8_t  (per-step semitone nudge, −24..+24)
 ```
 
 ---
@@ -106,8 +113,17 @@ Patterns are stored as JSON blobs in the `seq_patterns` table:
   "tracks": [
     {
       "name": "Kick",
-      "stepCount": 16,
-      "steps": [{"active": true, "note": 36, "velocity": 100, "gate_percent": 75}, ...]
+      "melodic": false,
+      "step_count": 16,
+      "step_ticks": 240,
+      "swing": 0.0,
+      "base_note": 36,
+      "midi_channel": 10,
+      "use_scale": false,
+      "steps": [
+        {"active": true, "note": 36, "velocity": 100, "gate_percent": 75,
+         "accent": false, "slide": false, "pitch_offset": 0}
+      ]
     }
   ]
 }

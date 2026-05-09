@@ -184,19 +184,39 @@ Response: `{ "type": "transport_ack" }` — the UI then re-fetches `project_stat
 
 ### add_mod_route / update_mod_route / remove_mod_route
 
+`source` and `dest` are **integer enum values** (not strings). See `ModSource` / `ModDest` in `Types.h`.
+
+| `source` | Enum | `source_id` |
+|---|---|---|
+| 0 | Lfo | LFO instance ID string |
+| 1 | Velocity | `""` |
+| 2 | Aftertouch | `""` |
+| 3 | ModWheel | `""` |
+| 4 | PitchBend | `""` |
+| 5 | MidiCC | `"cc74"` (e.g. CC 74) |
+
+| `dest` | Enum | `dest_id` |
+|---|---|---|
+| 0 | MidiCC | control ID string |
+| 1–4 | SeqPitch/Vel/Gate/Rate | track index as string (`"0"`) |
+| 5–6 | LfoRate/Depth | LFO instance ID string |
+| 7 | SnapshotMorph | `"sceneA:sceneB"` pair |
+
 ```json
 {
   "type": "add_mod_route",
-  "route_id": "r1",
-  "source": "lfo",          // lfo | velocity | aftertouch | modwheel | pitchbend | midi_cc
-  "lfo_id": "lfo_1",        // for lfo source
-  "dest": "midi_cc",        // midi_cc | seq_pitch | seq_velocity | seq_gate | seq_rate | lfo_rate | lfo_depth | snapshot_morph
-  "control_id": 74,         // CC number for midi_cc dest
-  "track_id": 0,            // track index for seq_* dests
-  "amount": 0.8
+  "route_id": "r_unique_id",
+  "source": 0,
+  "source_id": "lfo_1",
+  "dest": 0,
+  "dest_id": "filter_cc",
+  "amount": 0.8,
+  "offset": 0.0,
+  "enabled": true
 }
 
-{ "type": "update_mod_route", "route_id": "r1", "amount": 0.5 }
+{ "type": "update_mod_route", "route_id": "r1", "source": 0, "source_id": "lfo_1",
+  "dest": 0, "dest_id": "filter_cc", "amount": 0.5, "offset": 0.0, "enabled": true }
 { "type": "remove_mod_route", "route_id": "r1" }
 ```
 
@@ -231,8 +251,22 @@ Response: `{ "type": "transport_ack" }` — the UI then re-fetches `project_stat
 ## Scenes
 
 ```json
-{ "type": "save_scene",   "name": "Verse" }
-{ "type": "recall_scene", "scene_id": "scene_1" }
+// Capture current control state as a named scene.
+// scene_id must be supplied by the caller (unique, URL-safe string).
+{ "type": "save_scene", "scene_id": "scene_verse_1748000000000", "name": "Verse" }
+// Response: { "type": "scene_saved", "scene_id": "scene_verse_..." }
+// Then the daemon broadcasts scenes_list automatically.
+
+// Recall a scene (jumps instantly by default).
+{ "type": "trigger_scene", "scene_id": "scene_1", "mode": "jump", "duration_bars": 4 }
+// mode: "jump" | "fade" | "drop" | "morph"   (default: "jump")
+// Response: { "type": "scene_triggered", "scene_id": "scene_1" }
+
+// Delete a scene.
+{ "type": "delete_scene", "scene_id": "scene_1" }
+// Response: { "type": "scene_deleted", "scene_id": "scene_1" }
+// Then the daemon broadcasts scenes_list automatically.
+
 { "type": "list_scenes" }
 // Response: { "type": "scenes_list", "scenes": ["scene_1", "scene_2"] }
 ```
@@ -291,6 +325,20 @@ Response: `{ "type": "transport_ack" }` — the UI then re-fetches `project_stat
 | `project_state` | Every beat tick; after transport commands |
 | `sequencer_state` | Every step fire; after set_track / set_step / load_pattern |
 | `control_values` | When a hardware control changes |
-| `lfo_preview` | Response to get_lfo_preview |
+| `lfo_preview` | Response to `get_lfo_preview` |
+| `lfos_list` | After any lfo_added / lfo_updated / lfo_removed |
+| `mod_routes_list` | After any mod_route_added / updated / removed |
+| `scenes_list` | After scene_saved or scene_deleted |
+| `patterns_list` | After pattern_saved |
 | `tempo_set` | When BPM changes |
 | `transport_ack` | After transport command processed |
+| `arp_config` | Response to `get_arp` |
+| `arrange_clips` | Response to `arrange_get_clips` |
+
+## Acknowledge-only Responses (no state update)
+
+These are sent back to the requesting client but do not carry payload data:
+
+`arp_set`, `arrange_clip_set`, `arrange_clip_removed`, `scene_triggered`,
+`mapping_updated`, `record_started`, `record_stopped`, `midi_input_opened`,
+`midi_input_closed`.

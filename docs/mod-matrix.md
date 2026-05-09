@@ -14,14 +14,16 @@ The modulation matrix connects *sources* (things that produce a signal) to *dest
 
 ## Sources
 
-| Enum value | Source | Signal range |
-|---|---|---|
-| `ModSource::Lfo` | Named LFO instance (`sourceId` = lfoId) | –1 to +1 (bipolar) or 0–1 |
-| `ModSource::Velocity` | Last MIDI note-on velocity per channel | 0–1 |
-| `ModSource::Aftertouch` | Channel pressure | 0–1 |
-| `ModSource::ModWheel` | CC 1 | 0–1 |
-| `ModSource::PitchBend` | Pitch bend | –1 to +1 |
-| `ModSource::MidiCC` | Arbitrary CC number (`controlId`) | 0–1 |
+`source` is serialized as an integer in JSON and in the database.
+
+| Int | Enum | Source | Signal range | `source_id` |
+|---|---|---|---|---|
+| 0 | `Lfo` | Named LFO instance | –1..+1 (bipolar) or 0..1 | LFO ID string |
+| 1 | `Velocity` | Last MIDI note-on velocity | 0..1 | `""` |
+| 2 | `Aftertouch` | Channel pressure | 0..1 | `""` |
+| 3 | `ModWheel` | CC 1 | 0..1 | `""` |
+| 4 | `PitchBend` | Pitch bend | –1..+1 | `""` |
+| 5 | `MidiCC` | Arbitrary CC | 0..1 | `"cc74"` format |
 
 Source values are fed into the matrix via:
 
@@ -38,16 +40,18 @@ These are called from the MIDI input callback in `main.cpp`.
 
 ## Destinations
 
-| Enum value | Destination | How it's applied |
-|---|---|---|
-| `ModDest::MidiCC` | Arbitrary MIDI CC | Accumulated mod added to CC 64 baseline, sent via MidiRouter |
-| `ModDest::SeqPitch` | Track pitch | `sequencer.setPitchMod(trackId, semitones)` |
-| `ModDest::SeqVelocity` | Track velocity | `sequencer.setVelocityMod(trackId, delta)` |
-| `ModDest::SeqGate` | Track gate % | `sequencer.setGateMod(trackId, multiplier)` |
-| `ModDest::SeqRate` | Track step rate | `sequencer.setRateMod(trackId, multiplier)` — maps [–1, 1] → [0.25×, 4×] |
-| `ModDest::LfoRate` | Another LFO's rate | `lfos.setRateMod(lfoId, multiplier)` |
-| `ModDest::LfoDepth` | Another LFO's depth | `lfos.setDepthMod(lfoId, scale)` |
-| `ModDest::SnapshotMorph` | Scene cross-fade | Fires `onMorph(destId, position)` callback |
+`dest` is serialized as an integer in JSON and in the database.
+
+| Int | Enum | Destination | `dest_id` | How it's applied |
+|---|---|---|---|---|
+| 0 | `MidiCC` | Arbitrary MIDI CC | control ID string | Accumulated mod → CC 64 ± 63, sent via MidiRouter |
+| 1 | `SeqPitch` | Track pitch | track index string | `sequencer.setPitchMod(trackId, semitones)` |
+| 2 | `SeqVelocity` | Track velocity | track index string | `sequencer.setVelocityMod(trackId, delta)` |
+| 3 | `SeqGate` | Track gate | track index string | `sequencer.setGateMod(trackId, multiplier)` |
+| 4 | `SeqRate` | Track step rate | track index string | `sequencer.setRateMod()` — maps [–1,1] → [0.25×,4×] |
+| 5 | `LfoRate` | Another LFO's rate | LFO ID string | `lfos.setRateMod(lfoId, multiplier)` |
+| 6 | `LfoDepth` | Another LFO's depth | LFO ID string | `lfos.setDepthMod(lfoId, scale)` |
+| 7 | `SnapshotMorph` | Scene cross-fade | `"sceneA:sceneB"` | Fires `onMorph(destId, position)` callback |
 
 ---
 
@@ -98,10 +102,12 @@ This single-tick latency is intentional and negligible at 960 PPQN.
 
 | Message | Key fields | Notes |
 |---|---|---|
-| `add_mod_route` | route fields | Creates a new route, persists to DB |
-| `update_mod_route` | `route_id` + route fields | Replaces existing route |
+| `add_mod_route` | route fields (see below) | Creates a new route, persists to DB |
+| `update_mod_route` | route fields (full object) | Replaces existing route |
 | `remove_mod_route` | `route_id` | Removes and deletes from DB |
 | `list_mod_routes` | — | Returns all `ModRoute` objects as JSON array |
+
+Route payload fields: `route_id` (string), `source` (int), `source_id` (string), `dest` (int), `dest_id` (string), `amount` (float −1..1), `offset` (float), `enabled` (bool). See [websocket-api.md](websocket-api.md) for the full example.
 
 ---
 

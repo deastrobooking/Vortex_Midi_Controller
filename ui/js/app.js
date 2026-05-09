@@ -27,6 +27,8 @@ export const state = {
   scales:      [],
   midiInputPorts: [],
   patternIds:  [],
+  arrangeClips: [],
+  arpConfigs:  {},   // trackId → ArpConfig
 };
 
 // ── Event bus ─────────────────────────────────────────────────────────────────
@@ -70,6 +72,7 @@ function connect() {
     send('list_scales');
     send('list_scenes');
     send('list_patterns', { project_id: 1 });
+    send('arrange_get_clips');
   });
 
   ws.addEventListener('close', () => {
@@ -166,6 +169,7 @@ function dispatch(msg) {
       break;
 
     case 'scene_saved':
+    case 'scene_deleted':
       send('list_scenes');
       break;
 
@@ -180,6 +184,26 @@ function dispatch(msg) {
     case 'tempo_set':
       state.tempo = msg.tempo;
       emit('tempo_changed', msg.tempo);
+      break;
+
+    case 'arp_config':
+      state.arpConfigs[msg.track_id] = msg;
+      emit('arp_config', msg);
+      break;
+
+    case 'arrange_clips':
+      state.arrangeClips = msg.clips ?? [];
+      emit('arrange_clips', state.arrangeClips);
+      break;
+
+    // Acknowledge-only responses — no state update needed.
+    case 'arp_set':
+    case 'arrange_clip_set':
+    case 'arrange_clip_removed':
+    case 'scene_triggered':
+    case 'mapping_updated':
+    case 'record_started':
+    case 'record_stopped':
       break;
 
     default:

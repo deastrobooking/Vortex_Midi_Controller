@@ -5,25 +5,44 @@
 import { send, on, state } from './app.js';
 
 // Ordered lists that define the grid axes.
+// enum value matches ModSource / ModDest in Types.h (must stay in sync).
 const SOURCES = [
-  { id: 'lfo',          label: 'LFO'       },
-  { id: 'velocity',     label: 'Velocity'  },
-  { id: 'aftertouch',   label: 'Aftertouch'},
-  { id: 'modwheel',     label: 'Mod Wheel' },
-  { id: 'pitchbend',    label: 'Pitch Bend'},
-  { id: 'midi_cc',      label: 'MIDI CC'   },
+  { id: 'lfo',         enum: 0, label: 'LFO'       },
+  { id: 'velocity',    enum: 1, label: 'Velocity'  },
+  { id: 'aftertouch',  enum: 2, label: 'Aftertouch'},
+  { id: 'modwheel',    enum: 3, label: 'Mod Wheel' },
+  { id: 'pitchbend',   enum: 4, label: 'Pitch Bend'},
+  { id: 'midi_cc',     enum: 5, label: 'MIDI CC'   },
 ];
 
 const DESTS = [
-  { id: 'midi_cc',         label: 'MIDI CC'     },
-  { id: 'seq_pitch',       label: 'Seq Pitch'   },
-  { id: 'seq_velocity',    label: 'Seq Velocity'},
-  { id: 'seq_gate',        label: 'Seq Gate'    },
-  { id: 'seq_rate',        label: 'Seq Rate'    },
-  { id: 'lfo_rate',        label: 'LFO Rate'    },
-  { id: 'lfo_depth',       label: 'LFO Depth'   },
-  { id: 'snapshot_morph',  label: 'Scene Morph' },
+  { id: 'midi_cc',        enum: 0, label: 'MIDI CC'     },
+  { id: 'seq_pitch',      enum: 1, label: 'Seq Pitch'   },
+  { id: 'seq_velocity',   enum: 2, label: 'Seq Velocity'},
+  { id: 'seq_gate',       enum: 3, label: 'Seq Gate'    },
+  { id: 'seq_rate',       enum: 4, label: 'Seq Rate'    },
+  { id: 'lfo_rate',       enum: 5, label: 'LFO Rate'    },
+  { id: 'lfo_depth',      enum: 6, label: 'LFO Depth'   },
+  { id: 'snapshot_morph', enum: 7, label: 'Scene Morph' },
 ];
+
+// Build source_id from popup fields for each source type.
+function buildSourceId(sourceEnum, lfoId, ccNum) {
+  if (sourceEnum === 0) return lfoId ?? '';          // Lfo
+  if (sourceEnum === 5) return `cc${ccNum ?? 1}`;   // MidiCC
+  return '';
+}
+
+// Build dest_id from popup fields for each dest type.
+function buildDestId(destEnum, trackId, lfoId) {
+  if (destEnum >= 1 && destEnum <= 4) return String(trackId ?? 0); // Seq*
+  if (destEnum === 5 || destEnum === 6) return lfoId ?? '';         // LfoRate/Depth
+  return '';  // MidiCC uses controlId separately; SnapshotMorph not yet wired
+}
+
+// Simple unique ID for new routes.
+let _routeSeq = 0;
+function newRouteId() { return `r${Date.now()}_${++_routeSeq}`; }
 
 let popup       = null;
 let popupRoute  = null;   // { source, dest } or existing route object
@@ -84,9 +103,10 @@ function buildTable() {
 function refreshCells() {
   const routes = state.modRoutes ?? [];
   document.querySelectorAll('.mm-cell').forEach(td => {
-    const src  = td.dataset.source;
-    const dst  = td.dataset.dest;
-    const route = routes.find(r => r.source === src && r.dest === dst);
+    const srcDef = SOURCES.find(s => s.id === td.dataset.source);
+    const dstDef = DESTS.find(d => d.id === td.dataset.dest);
+    // Server returns source/dest as integer enum values.
+    const route = routes.find(r => r.source === srcDef?.enum && r.dest === dstDef?.enum);
     td.innerHTML = '';
     td.classList.toggle('mm-active', !!route);
     if (route) {
@@ -151,8 +171,12 @@ function buildPopup() {
 }
 
 function openPopup(source, dest, cell) {
-  const route = (state.modRoutes ?? []).find(r => r.source === source && r.dest === dest);
-  popupRoute = route ? { ...route } : { source, dest, amount: 1, lfoId: null, controlId: null, trackId: 0 };
+  const srcDef = SOURCES.find(s => s.id === source);
+  const dstDef = DESTS.find(d => d.id === dest);
+  const route  = (state.modRoutes ?? []).find(
+    r => r.source === srcDef?.enum && r.dest === dstDef?.enum
+  );
+  popupRoute = route ? { ...route, source, dest } : { source, dest, amount: 1 };
 
   document.getElementById('mm-popup-title').textContent =
     `${SOURCES.find(s => s.id === source)?.label} → ${DESTS.find(d => d.id === dest)?.label}`;
@@ -196,26 +220,33 @@ function closePopup() {
 
 function applyRoute() {
   if (!popupRoute) return;
-  const lfoId    = document.getElementById('mm-lfo-id').value   || null;
-  const ccNum    = parseInt(document.getElementById('mm-cc-num').value);
-  const trackId  = parseInt(document.getElementById('mm-track-id').value);
-  const amount   = parseFloat(document.getElementById('mm-amount').value);
+  const lfoId   = document.getElementById('mm-lfo-id').value || '';
+  const ccNum   = parseInt(document.getElementById('mm-cc-num').value) || 1;
+  const trackId = parseInt(document.getElementById('mm-track-id').value) || 0;
+  const amount  = parseFloat(document.getElementById('mm-amount').value);
+
+  const srcDef = SOURCES.find(s => s.id === popupRoute.source);
+  const dstDef = DESTS.find(d => d.id === popupRoute.dest);
+  const srcEnum = srcDef?.enum ?? 0;
+  const dstEnum = dstDef?.enum ?? 0;
 
   const existing = (state.modRoutes ?? []).find(
-    r => r.source === popupRoute.source && r.dest === popupRoute.dest
+    r => r.route_id === popupRoute.route_id
   );
 
   const payload = {
-    source:     popupRoute.source,
-    dest:       popupRoute.dest,
+    route_id:  existing?.route_id ?? newRouteId(),
+    source:    srcEnum,
+    source_id: buildSourceId(srcEnum, lfoId, ccNum),
+    dest:      dstEnum,
+    dest_id:   buildDestId(dstEnum, trackId, lfoId),
     amount,
-    lfo_id:     lfoId,
-    control_id: isNaN(ccNum) ? 1 : ccNum,
-    track_id:   isNaN(trackId) ? 0 : trackId,
+    offset:    0,
+    enabled:   true,
   };
 
   if (existing) {
-    send('update_mod_route', { route_id: existing.route_id, ...payload });
+    send('update_mod_route', payload);
   } else {
     send('add_mod_route', payload);
   }
@@ -223,10 +254,7 @@ function applyRoute() {
 }
 
 function removeRoute() {
-  if (!popupRoute) return;
-  const existing = (state.modRoutes ?? []).find(
-    r => r.source === popupRoute.source && r.dest === popupRoute.dest
-  );
-  if (existing) send('remove_mod_route', { route_id: existing.route_id });
+  if (!popupRoute?.route_id) { closePopup(); return; }
+  send('remove_mod_route', { route_id: popupRoute.route_id });
   closePopup();
 }
